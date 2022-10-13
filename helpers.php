@@ -793,7 +793,7 @@ function sugg() //without followers and following
     $data1=array('result'=>array(),'suggestions'=>$data ?$data :array(),'is_membership'=>$res['membership']);
            
 
-   $json=fetchFeedResponse('Follow people to start seeing the photos and videos they share',$r['isblock'],$totalCount,$total_pages,$data1,'only suggestions');  
+   $json=fetchFeedResponse('Follow people to start seeing the photos and videos they share',"1",$totalCount,$total_pages,$data1,'only suggestions');  
  
     return $json;
    // print_r($json['data']['suggestions']);die;

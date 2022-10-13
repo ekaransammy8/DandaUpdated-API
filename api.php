@@ -1,10 +1,17 @@
 <?php
+
 //ini_set('display_errors', 'On'); error_reporting(E_ALL);
+ini_set('post_max_size', '800M');
+ini_set('upload_max_filesize', '2000M'); 
+//ini_set('max_execution_time', '300');
+//ini_set('MAX_FILE_SIZE', '300');
+
 include('config.php');
+
 //include('PHPMailer/PHPMailerAutoload.php');
 include('helpers.php');
-include($_SERVER['DOCUMENT_ROOT']."/api/vendor/autoload.php");
-
+include($_SERVER['DOCUMENT_ROOT']."/Danda-Backend/vendor/autoload.php");
+error_reporting(0);
 $server=$_SERVER['HTTP_HOST'];
 $action=$_REQUEST['action'];
 date_default_timezone_set("Asia/Calcutta");
@@ -169,7 +176,11 @@ switch($action)
 
 	case 'add_reportReasons':
 		  add_reportReasons();
-		  break;	  		  		  
+		  break;	
+  
+  case 'changePass':
+  		changePass();
+  		break;
 
 	default:
 	echo "Not Found!";      
@@ -178,7 +189,7 @@ switch($action)
 //https://sammyekaran.com/api/api.php?action=register
 function register()
 {
-    global $pdo;
+      global $pdo;
     extract($_REQUEST);
    
 	$query_sel="select * from register where email=:email";
@@ -229,10 +240,11 @@ function login()
 	global $server;
 	extract($_REQUEST);
 
+  
 	//if social login
     if($type=='socialLogin')
     {
-    	$stmt=$pdo->prepare("select *,if((profile_pic!='' && user_type='0'),(concat('https://".$server."/api/uploads/profile/', profile_pic)),(profile_pic)) AS profile_pic from register where email=:email");
+    	$stmt=$pdo->prepare("select *,if((profile_pic!='' && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', profile_pic)),(profile_pic)) AS profile_pic from register where email=:email");
     	$stmt->execute(array(':email'=>$email));
     	$row_sel=$stmt->fetch(PDO::FETCH_ASSOC);
     	if ($row_sel) {
@@ -255,7 +267,7 @@ function login()
 	if($input)
 	{
 		//check with mobile
-	    $stmt=$pdo->prepare("select *,if((profile_pic!='' && user_type='0'),(concat('https://".$server."/api/uploads/profile/', profile_pic)),(profile_pic)) AS profile_pic from register where contact=:contact");
+	    $stmt=$pdo->prepare("select *,if((profile_pic!='' && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', profile_pic)),(profile_pic)) AS profile_pic from register where contact=:contact");
 	    $stmt->execute(array(':contact'=>$email));
 	    $row_sel=$stmt->fetch(PDO::FETCH_ASSOC);
 	   
@@ -263,7 +275,7 @@ function login()
 	else
 	{
 		//check with email
-	    $stmt=$pdo->prepare("select *,if((profile_pic!='' && user_type='0'),(concat('https://".$server."/api/uploads/profile/', profile_pic)),(profile_pic)) AS profile_pic from register where email=:email");
+	    $stmt=$pdo->prepare("select *,if((profile_pic!='' && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', profile_pic)),(profile_pic)) AS profile_pic from register where email=:email");
 	    $stmt->execute(array(':email'=>$email));
 	    $row_sel=$stmt->fetch(PDO::FETCH_ASSOC);
 	   
@@ -429,7 +441,7 @@ function forgetPasswordByContact()
 	global $pdo;
 	extract($_REQUEST);
 	
-    $stmt=$pdo->prepare("select *,if((profile_pic!='' && user_type='0'),(concat('https://".$server."/api/uploads/profile/', profile_pic)),(profile_pic)) from register where contact=:contact");
+    $stmt=$pdo->prepare("select *,if((profile_pic!='' && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', profile_pic)),(profile_pic)) from register where contact=:contact");
     $stmt->execute(array(':contact'=>$contact));
     $row_sel=$stmt->fetch(PDO::FETCH_ASSOC);
 	if($row_sel)
@@ -492,7 +504,7 @@ function get_profile()
 	$server=$_SERVER['HTTP_HOST'];
 	/*$stmt=$pdo->prepare("select if((r.profile_pic!=''),(concat('https://".$server."/api/uploads/profile/', r.profile_pic)),('')) as profile_pic,r.website,r.fcm_token,r.bio,r.username,r.fullname,count(f.id) as followers from register as r left join followers as f on f.user_id=r.user_id where r.user_id=:user_id");*/
 
-	$stmt=$pdo->prepare("select if((r.profile_pic!=''),(concat('https://".$server."/api/uploads/profile/', r.profile_pic)),(profile_pic)) as profile_pic,r.website,r.fcm_token,r.bio,r.username,r.fullname,count(f.id) as followers from register as r left join followers as f on f.user_id=r.user_id where r.user_id=:user_id");
+	$stmt=$pdo->prepare("select if((r.profile_pic!=''),(concat('https://".$server."/Danda-Backend/uploads/profile/', r.profile_pic)),(profile_pic)) as profile_pic,r.website,r.fcm_token,r.bio,r.username,r.fullname,count(f.id) as followers from register as r left join followers as f on f.user_id=r.user_id where r.user_id=:user_id");
 	$stmt->execute(array('user_id'=>$user_id));
     $res=$stmt->fetch(PDO::FETCH_ASSOC);
       //print_r($server);die;
@@ -503,7 +515,8 @@ function get_profile()
     $stmt=$pdo->prepare("select connectStripeId from register where  user_id=:user_id");
 	$stmt->execute(array('user_id'=>$user_id));
 	$stripeKey=$stmt->fetch(PDO::FETCH_ASSOC);
-	$connected_with_stripe=$stripeKey['connectStripeId']?1:0;
+  
+	$connected_with_stripe=$stripeKey ? ($stripeKey['connectStripeId']?1:0):0;
 	//print_r($connected_with_stripe);die;
     if($rspns1)
     {
@@ -583,10 +596,10 @@ function get_profile()
 	    $row=$stmt->fetch(PDO::FETCH_ASSOC);
 	  
     	$stmt=$pdo->prepare("select id,upload_type,if((explicit=2),('1'),('0')) as explicit,CASE upload_type
-		      WHEN 'I' THEN concat('https://".$server."/api/uploads/images/', uploads)
-		      WHEN 'G' THEN concat('https://".$server."/api/uploads/gif/', uploads)
-		      ELSE concat('https://".$server."/api/uploads/videos/', uploads)
-		  END as post_url,if((thumbnail!=''),(concat('https://".$server."/api/uploads/thumbnails/', thumbnail)),('')) AS thumbnail_url  from uploads where user_id=:user_id and uploads!='0'  order by id desc ");
+		      WHEN 'I' THEN concat('https://".$server."/Danda-Backend/uploads/images/', uploads)
+		      WHEN 'G' THEN concat('https://".$server."/Danda-Backend/uploads/gif/', uploads)
+		      ELSE concat('https://".$server."/Danda-Backend/uploads/videos/', uploads)
+		  END as post_url,if((thumbnail!=''),(concat('https://".$server."/Danda-Backend/uploads/thumbnails/', thumbnail)),('')) AS thumbnail_url  from uploads where user_id=:user_id and uploads!='0'  order by id desc ");
 
 
 
@@ -865,7 +878,7 @@ function follow_list()
 	    	//get followers or followings information
 	    	if($search!='')
 	    	{
-	    		$sql="select *,if((profile_pic!='' && user_type='0'),(concat('https://".$server."/api/uploads/profile/', profile_pic)),(profile_pic)) from register where user_id IN('".implode("','",$d)."') and (fullname like '%".$search."%' or username like '%".$search."%' )";
+	    		$sql="select *,if((profile_pic!='' && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', profile_pic)),(profile_pic)) from register where user_id IN('".implode("','",$d)."') and (fullname like '%".$search."%' or username like '%".$search."%' )";
 		    	$stmt=$pdo->prepare($sql);
 				$stmt->execute(array());
 		     	$row=$stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -874,14 +887,14 @@ function follow_list()
 		     	$totalCount = $stmt->rowCount();
 		    	$total_pages = ceil($totalCount/$size);
 		    	$starting_limit=pagination($totalCount,$pageNo,$size);
-		    	$stmt1=$pdo->prepare("select *,if((profile_pic!='' && user_type='0'),(concat('https://".$server."/api/uploads/profile/', profile_pic)),(profile_pic)) from register where user_id IN('".implode("','",$d)."') and (fullname like '%".$search."%' or username like '%".$search."%' ) LIMIT $starting_limit,$size");
+		    	$stmt1=$pdo->prepare("select *,if((profile_pic!='' && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', profile_pic)),(profile_pic)) from register where user_id IN('".implode("','",$d)."') and (fullname like '%".$search."%' or username like '%".$search."%' ) LIMIT $starting_limit,$size");
 				$ar=array();
 				$stmt1->execute($ar);
 				/*--------------------------*/
 	    	}
 	    	else
 	    	{
-	    		$sql="select *,if((profile_pic!='' && user_type='0'),(concat('https://".$server."/api/uploads/profile/', profile_pic)),(profile_pic)) from register where user_id IN('".implode("','",$d)."') ";
+	    		$sql="select *,if((profile_pic!='' && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', profile_pic)),(profile_pic)) from register where user_id IN('".implode("','",$d)."') ";
 		    	$stmt=$pdo->prepare($sql);
 				$stmt->execute(array());
 		     	$row=$stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -890,7 +903,7 @@ function follow_list()
 		     	$totalCount = $stmt->rowCount();
 		    	$total_pages = ceil($totalCount/$size);
 		    	$starting_limit=pagination($totalCount,$pageNo,$size);
-		    	$stmt1=$pdo->prepare("select *,if((profile_pic!='' && user_type='0'),(concat('https://".$server."/api/uploads/profile/', profile_pic)),(profile_pic)) from register where user_id IN('".implode("','",$d)."') LIMIT $starting_limit,$size");
+		    	$stmt1=$pdo->prepare("select *,if((profile_pic!='' && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', profile_pic)),(profile_pic)) from register where user_id IN('".implode("','",$d)."') LIMIT $starting_limit,$size");
 				$ar=array();
 				$stmt1->execute($ar);
 				/*------pagination---------*/
@@ -1003,6 +1016,7 @@ function follow_list()
 
 function post_upload()
 {
+  //try{
 	global $pdo;
 	extract($_REQUEST);
 	$time=date("H:i:s");
@@ -1010,39 +1024,66 @@ function post_upload()
 	$data=$_REQUEST['content'];
 	$content = json_decode($data, true);
 	//$tagUsers=explode(',',$tagUsers);
-
+ 
 	$stmt=$pdo->prepare("select * from register where user_id=:user_id");
 	$stmt->execute(array('user_id'=>$user_id));
     $res=$stmt->fetch(PDO::FETCH_ASSOC);
-    if($res)
+   //print_r($res);die;
+    if(empty($res))
     {
+      
 
-    	if($_REQUEST['thumbnail'])
-        {
-        	//echo "string";
-        	$thumbnail = $_REQUEST['thumbnail'];
-			$pp = str_replace('', '+',$thumbnail);
-			$path=dirname(__FILE__)."/uploads/thumbnails/";
-		    $thumbnail_img = upload_base64_image($thumbnail,$path);
+          //$json=new stdClass();
+          $status='0';
+          $message='user not found';
+     }
 
+    if($_REQUEST['thumbnail'])
+    {
+      //echo "string";
+      $thumbnail = $_REQUEST['thumbnail'];
+      $pp = str_replace('', '+',$thumbnail);
+      $path=dirname(__FILE__)."/uploads/thumbnails/";
+      $thumbnail_img = upload_base64_image($thumbnail,$path);
 
+    }else{
+      //echo "fghfhfg";
+      $status='0';
+      $message='Please select thumbnail';
+      $json=new stdClass();
 
-       
+    }
 
     	
 		$image_name=$_FILES['posts']['name'];
 
+        if($image_name == '')
+          {
+          //echo "1";
+           $status='0';
+            $message='Please select file';
+            $json=new stdClass();
+        }
+   // echo "hlo";
+      	//print_r($image_name);die;
 		$img_temp_name=$_FILES['posts']['tmp_name'];
 		$profile_pic=upload_images($image_name,'uploads/',$img_temp_name);
 
         
 		
-		//print_r($path);die;
-		if($profile_pic)
+		//print_r($profile_pic);die;
+		if($profile_pic == '')
 		{
-			$data2=array('user_id'=>$user_id,'uploads'=>$profile_pic,'caption'=>$caption,'explicit'=>0,'upload_type'=>$upload_type,'date'=>$date,'time'=>$time,'thumbnail'=>$thumbnail_img);
+          
+			$status='0';
+			$message='invalid uploaded file'; 
+		}
+			$data2=array('user_id'=>$user_id,'uploads'=>$profile_pic,'caption'=>$caption,'explicit'=>'1','upload_type'=>$upload_type,'date'=>$date,'time'=>$time,'thumbnail'=>$thumbnail_img);
+    //print_r($data2);die;
 	  		$stmt_insert=insert('uploads',$data2);
+         
 	  		if($stmt_insert)
+         
 	  		{
 	  			
 		  		$id=$pdo->lastInsertId();
@@ -1087,31 +1128,20 @@ function post_upload()
 				$status='0';
 				$message='something went wrong';
 			}
-		}
-		else
-		{
-			$status='0';
-			$message='invalid uploaded file';
-		}
+		
 
-	 }else{
-    	//echo "fghfhfg";
-    	$status='0';
-	    $message='Please select thumbnail';
-	    $json=new stdClass();
-	   
-    }
+	
 
-}else
-{
-	//$json=new stdClass();
-	$status='0';
-	$message='user not found';
-}
+
 
     $json=array('message'=>$message,'status'=>$status,'data'=>$json);
 	echo "{\"response\":" . json_encode($json) . "}";
 	exit();
+ // }
+ // catch(Exception $e) {
+ // echo 'Message: ' .$e->getMessage();
+//}
+  
 }
 
 /*********************delete post******************/
@@ -1154,6 +1184,7 @@ function exploreData()
 	global $server;
 	extract($_REQUEST);
 	$Size=50;
+  	$pageNo = isset($pageNo) ? $pageNo : 1;
 
 	$stmt=$pdo->prepare("select * from register where user_id=:user_id");
 	$stmt->execute(array('user_id'=>$user_id));
@@ -1168,11 +1199,12 @@ function exploreData()
 	$stmt=$pdo->prepare("select connectStripeId from register where  user_id=:user_id");
 	$stmt->execute(array('user_id'=>$user_id));
 	$stripeKey=$stmt->fetch(PDO::FETCH_ASSOC);
-	$connected_with_stripe=$stripeKey['connectStripeId']?1:0;
+
+	$connected_with_stripe= $stripeKey ? ($stripeKey['connectStripeId']?1:0 ) : 0;
 
     if($res)
     {
-		$stmt=$pdo->prepare("SELECT u.*,if((u.upload_type='I'),(concat('https://".$server."/api/uploads/images/', uploads)),(concat('https://".$server."/api/uploads/videos/', uploads))) AS post_url,if((u.thumbnail!=''),(concat('https://".$server."/api/uploads/thumbnails/', thumbnail)),('')) AS thumbnail_url,count(l.id)as likess FROM `uploads` as u join likes as l on l.upload_id=u.id group by u.id order by likess desc");
+		$stmt=$pdo->prepare("SELECT u.*,if((u.upload_type='I'),(concat('https://".$server."/Danda-Backend/uploads/images/', uploads)),(concat('https://".$server."/Danda-Backend/uploads/videos/', 		uploads))) AS post_url,if((u.thumbnail!=''),(concat('https://".$server."/Danda-Backend/uploads/thumbnails/', thumbnail)),('')) AS thumbnail_url,count(l.id)as likess FROM `uploads` as u join likes as l on l.upload_id=u.id group by u.id order by likess desc");
 		$stmt->execute(array());
 		$result=$stmt->fetchAll(PDO::FETCH_ASSOC);
 		//print_r($pageNo);die;
@@ -1192,16 +1224,17 @@ function exploreData()
 				$pageno = $page;
 			}
 			$starting_limit = ($pageno-1)*$Size;
-			$show="SELECT u.*,if((u.upload_type='I'),(concat('https://".$server."/api/uploads/images/', uploads)),(concat('https://".$server."/api/uploads/videos/', uploads))) AS post_url,if((u.thumbnail!=''),(concat('https://".$server."/api/uploads/thumbnails/', thumbnail)),('')) AS thumbnail_url,count(l.id)as likess FROM `uploads` as u join likes as l on l.upload_id=u.id group by u.id order by likess desc LIMIT $starting_limit, $Size";
+			$show="SELECT u.*,if((u.upload_type='I'),(concat('https://".$server."/Danda-Backend/uploads/images/', uploads)),(concat('https://".$server."/Danda-Backend/uploads/videos/', uploads))) AS 				post_url,if((u.thumbnail!=''),(concat('https://".$server."/Danda-Backend/uploads/thumbnails/', thumbnail)),('')) AS thumbnail_url,count(l.id)as likess FROM `uploads` as u join likes as l on 				l.upload_id=u.id group by u.id order by likess desc LIMIT $starting_limit, $Size";
 			$result=$pdo->prepare($show);
 			$result->execute(array());
+          	$data = [];
 			foreach($result as $r)
 			{
 				////membership purchased for one person
 				$stmt=$pdo->prepare("select endDate from followSubscription where toUserId=:toUserId and fromUserId=:fromUserId and subscriptionType='0' ");
 				$stmt->execute(array('fromUserId'=>$user_id,'toUserId'=>$r['user_id']));
 		    	$rspnss=$stmt->fetch(PDO::FETCH_ASSOC);
-		    	$isFollowSubscriptionPurchased=(strtotime($rspnss['endDate']) > strtotime(date('Y-m-d')))?'1':'0';
+		    	$isFollowSubscriptionPurchased=$rspnss ? ((strtotime($rspnss['endDate']) > strtotime(date('Y-m-d')))?'1':'0') :'0';
 
 				$data[]=array(
 								'user_id'=>$r['user_id'],
@@ -1212,8 +1245,9 @@ function exploreData()
 								'is_explicit'=>($r['explicit']==2) ? '1' : '0' ,
 								'isFollowSubscriptionPurchased'=>$isFollowSubscriptionPurchased,
 								);
+             
 			}
-			$json=array('message'=>'success','status'=>'1','current_page'=>$pageNo,'page_size'=>$Size,'total_records'=>"$totalCount",'last_page'=>"$total_pages",'is_membership'=>$res['membership'],'subscriptionType'=>$subscriptionType,'data'=>$data);
+												$json=array('message'=>'success','status'=>'1','current_page'=>$pageNo,'page_size'=>$Size,'total_records'=>"$totalCount",'last_page'=>"$total_pages",'is_membership'=>$res['membership'],'subscriptionType'=>$subscriptionType,'data'=>$data);
 		}
 		else
 		{
@@ -1240,10 +1274,10 @@ function get_noti()
     $result=$stmt->fetchAll(PDO::FETCH_ASSOC);
 	if($result)
     {
-    	$stmt=$pdo->prepare("select if((n.upload_id='0'),(''),(u.caption))as caption,if((n.upload_id='0'),(n.follower_id),(''))as users,n.notification,if((r.profile_pic!=''  && user_type='0'),(concat('https://".$server."/api/uploads/profile/', r.profile_pic)),(profile_pic)) AS profile_pic,CASE u.upload_type
-      WHEN 'I' THEN concat('https://".$server."/api/uploads/images/', u.uploads)
-      WHEN 'G' THEN concat('https://".$server."/api/uploads/gif/', u.uploads)
-      ELSE concat('https://".$server."/api/uploads/videos/', u.uploads)
+    	$stmt=$pdo->prepare("select if((n.upload_id='0'),(''),(u.caption))as caption,if((n.upload_id='0'),(n.follower_id),(''))as users,n.notification,if((r.profile_pic!=''  && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', r.profile_pic)),(profile_pic)) AS profile_pic,CASE u.upload_type
+      WHEN 'I' THEN concat('https://".$server."/Danda-Backend/uploads/images/', u.uploads)
+      WHEN 'G' THEN concat('https://".$server."/Danda-Backend/uploads/gif/', u.uploads)
+      ELSE concat('https://".$server."/Danda-Backend/uploads/videos/', u.uploads)
   END as 'post_url',upload_id,r.username from notifications as n left join register as r on r.user_id=n.follower_id left join uploads as u on u.id=n.upload_id where n.user_id=:user_id order by n.id desc");
 		$stmt->execute(array('user_id'=>$user_id));
 	    $res=$stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -1254,10 +1288,10 @@ function get_noti()
 			$totalCount = $stmt->rowCount();
 			$total_pages = ceil($totalCount/$size);
 			$starting_limit=pagination($totalCount,$pageNo,$size);
-			$stmt1=$pdo->prepare("select if((n.upload_id='0'),(''),(u.caption))as caption,if((n.upload_id='0'),(n.follower_id),(n.follower_id))as users,n.notification,if((r.profile_pic!='' && user_type='0'),(concat('https://".$server."/api/uploads/profile/', r.profile_pic)),(profile_pic)) AS profile_pic,CASE u.upload_type
-      WHEN 'I' THEN concat('https://".$server."/api/uploads/images/', u.uploads)
-      WHEN 'G' THEN concat('https://".$server."/api/uploads/gif/', u.uploads)
-      ELSE concat('https://".$server."/api/uploads/videos/', u.uploads)
+			$stmt1=$pdo->prepare("select if((n.upload_id='0'),(''),(u.caption))as caption,if((n.upload_id='0'),(n.follower_id),(n.follower_id))as users,n.notification,if((r.profile_pic!='' && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', r.profile_pic)),(profile_pic)) AS profile_pic,CASE u.upload_type
+      WHEN 'I' THEN concat('https://".$server."/Danda-Backend/uploads/images/', u.uploads)
+      WHEN 'G' THEN concat('https://".$server."/Danda-Backend/uploads/gif/', u.uploads)
+      ELSE concat('https://".$server."/Danda-Backend/uploads/videos/', u.uploads)
   END as 'post_url',upload_id,r.username from notifications as n left join register as r on r.user_id=n.follower_id left join uploads as u on u.id=n.upload_id where n.user_id=:user_id order by n.id desc LIMIT $starting_limit, $size");
 			$ar=array('user_id'=>$user_id);
 			$stmt1->execute($ar);
@@ -1331,16 +1365,18 @@ function search_user()
 		    	}
 		    	$fol=implode(',',$ids);
 		    	$ar_mrg = array_merge($results, $rsults);
+              
+                if($ar_mrg)
+                {
+                    foreach($ar_mrg as $a)
+                    {
+                        $thh[]=implode('',$a);
+                    }
+                    $th=implode(',',$thh);
+                }
 		    }
 
-	    	if($ar_mrg)
-	    	{
-	   		 	foreach($ar_mrg as $a)
-	   		 	{
-	   		 		$thh[]=implode('',$a);
-	   		 	}
-	   		 	$th=implode(',',$thh);
-	   		}
+	    	
 	   		//print_r($th);die;
    		}
    		else
@@ -1370,7 +1406,7 @@ function search_user()
 	   	if($search=='')
 		{	 	
 	   		//suggestion list when search is empty
-   		 	$sql="select r.user_id,r.username,r.fullname,if((r.profile_pic!='' && user_type='0'),(concat('https://".$server."/api/uploads/profile/', r.profile_pic)),('')) AS profile_pic,count(f.user_id) as count  from register as r left join followers as f on f.user_id=r.user_id where r.user_id!=:user_id and r.user_id not IN(".$sugges.") group by user_id order by count desc";
+   		 	$sql="select r.user_id,r.username,r.fullname,if((r.profile_pic!='' && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', r.profile_pic)),('')) AS profile_pic,count(f.user_id) as count  from register as r left join followers as f on f.user_id=r.user_id where r.user_id!=:user_id and r.user_id not IN(".$sugges.") group by user_id order by count desc";
 	    	$stmt=$pdo->prepare($sql);
 			$stmt->execute(array('user_id'=>$user_id));
 		    $res=$stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -1381,7 +1417,7 @@ function search_user()
 		    	$totalCount =  $stmt->rowCount();
 		    	$total_pages = ceil($totalCount/$size);
 		    	$starting_limit=pagination('50',$pageNo,$size);
-		    	$stmt1=$pdo->prepare("select r.user_id,r.username,r.fullname,if((r.profile_pic!='' && user_type='0'),(concat('https://".$server."/api/uploads/profile/', r.profile_pic)),('')) AS profile_pic,count(f.user_id) as count  from register as r left join followers as f on f.user_id=r.user_id where  r.user_id!=:user_id and r.user_id not IN(".$sugges.") group by user_id order by count desc LIMIT $starting_limit, $size");
+		    	$stmt1=$pdo->prepare("select r.user_id,r.username,r.fullname,if((r.profile_pic!='' && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', r.profile_pic)),('')) AS profile_pic,count(f.user_id) as count  from register as r left join followers as f on f.user_id=r.user_id where  r.user_id!=:user_id and r.user_id not IN(".$sugges.") group by user_id order by count desc LIMIT $starting_limit, $size");
 				$ar=array('user_id'=>$user_id);
 				$stmt1->execute($ar);
 				/*----------------------------------*/
@@ -1396,7 +1432,7 @@ function search_user()
 			else
 			{
 				//$sql="select user_id,username,fullname,if((profile_pic!=''),(concat('https://".$server."/api/uploads/profile/', profile_pic)),('')) AS profile_pic from register where user_id!=:user_id  limit 20 ";
-				$sql="select user_id,username,fullname,if((profile_pic!='' && user_type='0'),(concat('https://".$server."/api/uploads/profile/', profile_pic)),('')) AS profile_pic from register where  user_id NOT IN(".$user_mrg.") limit 50 ";
+				$sql="select user_id,username,fullname,if((profile_pic!='' && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', profile_pic)),('')) AS profile_pic from register where  user_id NOT IN(".$user_mrg.") limit 50 ";
 		  		$stmt=$pdo->prepare($sql);
 				$stmt->execute(array());
 			    $json=$stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -1406,7 +1442,7 @@ function search_user()
 		    		$totalCount = $stmt->rowCount();
 		    		$total_pages = ceil($totalCount/$size);
 			    	$starting_limit=pagination('50',$pageNo,$size);
-			    	$stmt1=$pdo->prepare("select user_id,username,fullname,if((profile_pic!='' && user_type='0'),(concat('https://".$server."/api/uploads/profile/', profile_pic)),('')) from register where user_id NOT IN(".$user_mrg.")  LIMIT $starting_limit, $size");
+			    	$stmt1=$pdo->prepare("select user_id,username,fullname,if((profile_pic!='' && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', profile_pic)),('')) from register where user_id NOT IN(".$user_mrg.")  LIMIT $starting_limit, $size");
 					$ar=array('user_id'=>$user_id);
 					$stmt1->execute($ar);
 					/*****************************/
@@ -1435,7 +1471,7 @@ function search_user()
 			$block_users=empty($block_users)?'0':implode(',',$block_users);
 
 			//$stmt=$pdo->prepare("select r.user_id,r.username,r.fullname,if((profile_pic!=''),(concat('https://".$server."/api/uploads/profile/', profile_pic)),('')) AS profile_pic ,f.follower_id,f.user_id as following FROM register as r left JOIN followers as f on (r.user_id=f.user_id and f.follower_id=:userid) where r.fullname like '%".$search."%' or r.username like '%".$search."%'  and r.user_id!=:user_id  group by r.user_id");
-			$qry="select r.user_id,r.username,r.fullname,if((r.profile_pic!='' && user_type='0'),(concat('https://".$server."/api/uploads/profile/', r.profile_pic)),('')) AS profile_pic ,f.follower_id,f.user_id as following FROM register as r left JOIN followers as f on (r.user_id=f.user_id and f.follower_id=:userid) where ((r.user_id not IN(".$block_users.")) or r.user_id=:user_id) and (r.fullname like '%".$search."%' or r.username like '%".$search."%')   group by r.user_id ";
+			$qry="select r.user_id,r.username,r.fullname,if((r.profile_pic!='' && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', r.profile_pic)),('')) AS profile_pic ,f.follower_id,f.user_id as following FROM register as r left JOIN followers as f on (r.user_id=f.user_id and f.follower_id=:userid) where ((r.user_id not IN(".$block_users.")) or r.user_id=:user_id) and (r.fullname like '%".$search."%' or r.username like '%".$search."%')   group by r.user_id ";
 			$stmt=$pdo->prepare($qry);
 			$ar=array('userid'=>$user_id,':user_id'=>$user_id);
 			$stmt->execute($ar);
@@ -1447,7 +1483,7 @@ function search_user()
 		    	$totalCount = $stmt->rowCount();
 		    	$total_pages = ceil($totalCount/$size);
 		    	$starting_limit=pagination($totalCount,$pageNo,$size);
-		    	$stmt1=$pdo->prepare("select r.user_id,r.username,r.fullname,if((r.profile_pic!='' && user_type='0'),(concat('https://".$server."/api/uploads/profile/', r.profile_pic)),('')) AS profile_pic ,f.follower_id,f.user_id as following FROM register as r left JOIN followers as f on (r.user_id=f.user_id and f.follower_id=:userid) where ((r.user_id not IN(".$block_users.")) or r.user_id=:user_id) and (r.fullname like '%".$search."%' or r.username like '%".$search."%')  group by r.user_id  LIMIT $starting_limit, $size");
+		    	$stmt1=$pdo->prepare("select r.user_id,r.username,r.fullname,if((r.profile_pic!='' && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', r.profile_pic)),('')) AS profile_pic ,f.follower_id,f.user_id as following FROM register as r left JOIN followers as f on (r.user_id=f.user_id and f.follower_id=:userid) where ((r.user_id not IN(".$block_users.")) or r.user_id=:user_id) and (r.fullname like '%".$search."%' or r.username like '%".$search."%')  group by r.user_id  LIMIT $starting_limit, $size");
 				$ar=array('userid'=>$user_id,':user_id'=>$user_id);
 				$stmt1->execute($ar);
 				/*-------------------------------*/
@@ -1500,7 +1536,7 @@ function fetch_feed()
     	{
 	    		///////////update token///////////
 	    	$where=array('user_id'=>$user_id);
-			$data1=array('device_token'=>$device_token,'device_type'=>$device_type,'fcm_token'=>$fcm_token,'deviceId'=>$device);
+			$data1=array('device_token'=>$device_token,'device_type'=>$device_type,'fcm_token'=>$fcm_token,'deviceId'=>$deviceId);
 			$stmt_updt=update_multi_where('register', $where, $data1);
     	}
     	
@@ -1522,7 +1558,16 @@ function fetch_feed()
 	    		$flwg[]=implode(",",$r);
 	    	
 	    	}
-	    		$fs=implode(',',$flwg);    //followings
+          
+	    	$fs=implode(',',$flwg);    //followings
+          
+			$block_users=blockUsers($user_id);
+			$sugges=array_unique(array_merge($block_users,$flwg));
+			$tt=implode(',',$sugges); //followings+block
+
+			$dd=blockUsers($user_id);
+			$unblock_followings = array_diff($flwg, $dd); 
+			$z=implode(',',$unblock_followings);
 	    }
 	    if($result)
 	    {
@@ -1534,46 +1579,22 @@ function fetch_feed()
 	    	$fo=implode(',',$d);		//followers
 	   		 	
 		 	$ar_mrg = array_merge($output, $result);
+          
+            if($ar_mrg)
+            {
+                foreach($ar_mrg as $a)
+                {
+                    $thh[]=implode('',$a);
+                }
+                $th=implode(',',$thh);
+
+                $dat=blockUser($thh,$user_id);
+                $th=implode(',',$dat['unblock_users']);
+            }
 		}
-		if($ar_mrg)
-		{
-		 	foreach($ar_mrg as $a)
-		 	{
-		 		$thh[]=implode('',$a);
-		 	}
-		 	$th=implode(',',$thh);
-		}
+		
 	 	
-	 	//print_r($th);die;
-	 	/*$dat1=blockUser($thh,$user_id);
-	 	$tt=$dat1['block_users'];
-	 	$tt=array_merge($thh,$tt);
-	 	$tt=implode(',',$tt);*/
-	 	//following+block
-	 	//print_r($user_id);die;
-	 	$block_users=blockUsers($user_id);
-	 	//print_r($flwg);die;
-	 	//$block_users=(array)$block_users;
-	 	$flwg=(array)$flwg;
-
-	 	$sugges=array_unique(array_merge($block_users,$flwg));
-		$tt=implode(',',$sugges); //followings+block
-		//print_r($sugges);die;
-	 	$dat=blockUser($thh,$user_id);
-	 	$th=implode(',',$dat['unblock_users']);
-	 	//print_r($dat);die;
-	 	//$dd=blockUser($z,$user_id); //unblock following
-	 	//$z=implode(',',$dd['unblock_users']);
-	 	$dd=blockUsers($user_id);
-	 	$unblock_followings = array_diff($flwg, $dd); 
-	 	$z=implode(',',$unblock_followings);
-	 	//print_r($user_id);
-
-	 	//$k=array();
-	 	//$k=array('all'=>$thh,'tt'=>$tt);
-	 	//print_r($z);die;
-
-    	//if(!empty($th))
+	 	
     	if(!empty($z))
     	{
 
@@ -1589,13 +1610,13 @@ function fetch_feed()
     		
 
     		//if followers and following exist
-    		$sql="select r.*,u.*,if((r.profile_pic!='' && user_type='0'),(concat('https://".$server."/api/uploads/profile/', r.profile_pic)),(profile_pic)) as dp,
+    		$sql="select r.*,u.*,if((r.profile_pic!='' && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', r.profile_pic)),(profile_pic)) as dp,
     		    CASE u.upload_type
-      			WHEN 'I' THEN concat('https://".$server."/api/uploads/images/', u.uploads)
-     			WHEN 'G' THEN concat('https://".$server."/api/uploads/gif/', u.uploads)
-      			ELSE concat('https://".$server."/api/uploads/videos/', u.uploads)
+      			WHEN 'I' THEN concat('https://".$server."/Danda-Backend/uploads/images/', u.uploads)
+     			WHEN 'G' THEN concat('https://".$server."/Danda-Backend/uploads/gif/', u.uploads)
+      			ELSE concat('https://".$server."/Danda-Backend/uploads/videos/', u.uploads)
   				END as 'post_url',
-  				if((thumbnail!=''),(concat('https://".$server."/api/uploads/thumbnails/', thumbnail)),('')) AS thumbnail_url ,c.comment from register as r  join uploads as u on r.user_id=u.user_id left join comments as c on (c.upload_id=u.id and c.follower_id=:user_id) left join reports as rs on rs.post_id!=u.id  where r.user_id IN(".$z.") or r.user_id=:user_id and u.uploads!='0' group by u.id  order by u.id desc";
+  				if((thumbnail!=''),(concat('https://".$server."/Danda-Backend/uploads/thumbnails/', thumbnail)),('')) AS thumbnail_url ,c.comment from register as r  join uploads as u on r.user_id=u.user_id left join comments as c on (c.upload_id=u.id and c.follower_id=:user_id) left join reports as rs on rs.post_id!=u.id  where r.user_id IN(".$z.") or r.user_id=:user_id and u.uploads!='0' group by u.id  order by u.id desc";
     	
     		$stmt=$pdo->prepare($sql);
 			$stmt->execute(array('user_id'=>$user_id));
@@ -1607,11 +1628,11 @@ function fetch_feed()
 	    		$totalCount = $stmt->rowCount();
 	    		$total_pages = ceil($totalCount/$size);
 		    	$starting_limit=pagination($totalCount,$pageNo,$size);
-		    	$stmt1=$pdo->prepare("select r.*,u.*,if((r.profile_pic!='' && user_type='0'),(concat('https://".$server."/api/uploads/profile/', r.profile_pic)),(profile_pic)) as dp,CASE u.upload_type
-				      WHEN 'I' THEN concat('https://".$server."/api/uploads/images/', u.uploads)
-				      WHEN 'G' THEN concat('https://".$server."/api/uploads/gif/', u.uploads)
-				      ELSE concat('https://".$server."/api/uploads/videos/', u.uploads)
-				  END as 'post_url',if((thumbnail!=''),(concat('https://".$server."/api/uploads/thumbnails/', thumbnail)),('')) AS thumbnail_url ,c.comment from register as r  join uploads as u on r.user_id=u.user_id left join comments as c on (c.upload_id=u.id and c.follower_id=:user_id) left join reports as rs on rs.post_id!=u.id   where r.user_id IN(".$z.") or r.user_id=:user_id and u.uploads!='0' group by u.id  order by u.id desc LIMIT $starting_limit, $size");
+		    	$stmt1=$pdo->prepare("select r.*,u.*,if((r.profile_pic!='' && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', r.profile_pic)),(profile_pic)) as dp,CASE u.upload_type
+				      WHEN 'I' THEN concat('https://".$server."/Danda-Backend/uploads/images/', u.uploads)
+				      WHEN 'G' THEN concat('https://".$server."/Danda-Backend/uploads/gif/', u.uploads)
+				      ELSE concat('https://".$server."/Danda-Backend/uploads/videos/', u.uploads)
+				  END as 'post_url',if((thumbnail!=''),(concat('https://".$server."/Danda-Backend/uploads/thumbnails/', thumbnail)),('')) AS thumbnail_url ,c.comment from register as r  join uploads as u on r.user_id=u.user_id left join comments as c on (c.upload_id=u.id and c.follower_id=:user_id) left join reports as rs on rs.post_id!=u.id   where r.user_id IN(".$z.") or r.user_id=:user_id and u.uploads!='0' group by u.id  order by u.id desc LIMIT $starting_limit, $size");
 				$ar=array('user_id'=>$user_id);
 				$stmt1->execute($ar);
 				 //$row=$stmt1->fetchAll(PDO::FETCH_ASSOC);
@@ -1663,7 +1684,7 @@ function fetch_feed()
 					$com=array('comments'=>$result['comment']);
 
 					//post shared or not
-					$stmt=$pdo->prepare("select r.user_id,r.username,(SELECT caption FROM uploads WHERE id=:post_id) as caption,if((r.profile_pic!='' && user_type='0'),(concat('https://".$server."/api/uploads/profile/', r.profile_pic)),(profile_pic)) as profile_pic
+					$stmt=$pdo->prepare("select r.user_id,r.username,(SELECT caption FROM uploads WHERE id=:post_id) as caption,if((r.profile_pic!='' && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', r.profile_pic)),(profile_pic)) as profile_pic
                         from register as r   join uploads as u on r.user_id=u.post_parent WHERE u.post_parent=:post_parent GROUP by user_id");
 					$stmt->execute(array('post_parent'=>$result['post_parent'],'post_id'=>$result['post_id']));
 					$shared=$stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -1713,8 +1734,9 @@ function fetch_feed()
 			}
 			else
 			{
+             
 				//if no post upload(suggestions)
-				$sql="select r.user_id,r.membership,r.username,r.fullname,if((r.profile_pic!='' && user_type='0'),(concat('https://".$server."/api/uploads/profile/', r.profile_pic)),(profile_pic)) AS profile_pic from register as r left join followers as f on f.user_id=r.user_id where r.user_type='0' and r.user_id!=:user_id and r.user_id not IN(".$tt.") group by user_id order by count desc";
+				$sql="select r.user_id,r.membership,r.username,r.fullname,if((r.profile_pic!='' && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', r.profile_pic)),(profile_pic)) AS profile_pic from register as r left join followers as f on f.user_id=r.user_id where r.user_type='0' and r.user_id!=:user_id and r.user_id not IN(".$tt.") group by user_id order by count desc";
                 $stmt=$pdo->prepare($sql);
                 $stmt->execute(array('user_id'=>$user_id));
                 $json=$stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -1728,7 +1750,7 @@ function fetch_feed()
                     $total_pages = ceil($totalCount/10);
                     $starting_limit=pagination($totalCount,$pageNo,10);
                    // $sql="select r.user_id,r.membership,r.username,r.fullname,if((r.profile_pic!=''),(concat('https://".$server."/api/uploads/profile/', r.profile_pic)),('')) AS profile_pic,count(f.user_id) as count  from register as r left join followers as f on f.user_id=r.user_id where r.user_id!=:user_id and r.user_id not IN(".$tt.") group by user_id order by count desc LIMIT $starting_limit, $size";
-                    $sql="select r.user_id,r.membership,r.username,r.fullname,if((r.profile_pic!='' && user_type='0'),(concat('https://".$server."/api/uploads/profile/', r.profile_pic)),(profile_pic)) AS profile_pic  from register as r left join followers as f on f.user_id=r.user_id where r.user_type='0' and r.user_id!=:user_id and r.user_id not IN(".$tt.") group by user_id order by count desc LIMIT $starting_limit, $size";
+                    $sql="select r.user_id,r.membership,r.username,r.fullname,if((r.profile_pic!='' && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', r.profile_pic)),(profile_pic)) AS profile_pic  from register as r left join followers as f on f.user_id=r.user_id where r.user_type='0' and r.user_id!=:user_id and r.user_id not IN(".$tt.") group by user_id order by count desc LIMIT $starting_limit, $size";
                     $stmt1=$pdo->prepare($sql);
                     $ar=array('user_id'=>$user_id);
                     $stmt1->execute($ar);
@@ -1766,17 +1788,19 @@ function fetch_feed()
     	}
     	else
     	{
+         
     		//if no follower/following but own feed exist
     		$suggestion=sugg();
     		$suggestion=$suggestion['data']['suggestions'];	 
-    		//print_r($suggestion);die;		
+          	$data_suggestion=($pageNo==1)?$suggestion :array();
+    		//print_r($data_suggestion);die;		
 
-    		$sql="select r.*,u.*,if((r.profile_pic!='' && user_type='0'),(concat('https://".$server."/api/uploads/profile/', r.profile_pic)),(profile_pic)) as dp,
+    		$sql="select r.*,u.*,if((r.profile_pic!='' && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', r.profile_pic)),(profile_pic)) as dp,
     		CASE u.upload_type
-      WHEN 'I' THEN concat('https://".$server."/api/uploads/images/', u.uploads)
-      WHEN 'G' THEN concat('https://".$server."/api/uploads/gif/', u.uploads)
-      ELSE concat('https://".$server."/api/uploads/videos/', u.uploads)
-  		END as 'post_url',if((thumbnail!=''),(concat('https://".$server."/api/uploads/thumbnails/', thumbnail)),('')) AS thumbnail_url ,c.comment from register as r  join uploads as u on r.user_id=u.user_id left join comments as c on (c.upload_id=u.id and c.follower_id=:user_id)  where r.user_id=:user_id and u.uploads!='0' group by u.id  order by u.id desc";
+      WHEN 'I' THEN concat('https://".$server."/Danda-Backend/uploads/images/', u.uploads)
+      WHEN 'G' THEN concat('https://".$server."/Danda-Backend/uploads/gif/', u.uploads)
+      ELSE concat('https://".$server."/Danda-Backend/uploads/videos/', u.uploads)
+  		END as 'post_url',if((thumbnail!=''),(concat('https://".$server."/Danda-Backend/uploads/thumbnails/', thumbnail)),('')) AS thumbnail_url ,c.comment from register as r  join uploads as u on r.user_id=u.user_id left join comments as c on (c.upload_id=u.id and c.follower_id=:user_id)  where r.user_id=:user_id and u.uploads!='0' group by u.id  order by u.id desc";
     		$stmt=$pdo->prepare($sql);
 			$stmt->execute(array('user_id'=>$user_id));
 		    $op=$stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -1786,11 +1810,11 @@ function fetch_feed()
 	    		$totalCount = $stmt->rowCount();
 	    		$total_pages = ceil($totalCount/$size);
 		    	$starting_limit=pagination($totalCount,$pageNo,$size);
-		    	$stmt1=$pdo->prepare("select r.*,u.*,if((r.profile_pic!=''  && user_type='0'),(concat('https://".$server."/api/uploads/profile/', r.profile_pic)),(profile_pic)) as dp,CASE u.upload_type
-      WHEN 'I' THEN concat('https://".$server."/api/uploads/images/', u.uploads)
-      WHEN 'G' THEN concat('https://".$server."/api/uploads/gif/', u.uploads)
-      ELSE concat('https://".$server."/api/uploads/videos/', u.uploads)
-  END as 'post_url',if((thumbnail!=''),(concat('https://".$server."/api/uploads/thumbnails/', thumbnail)),('')) AS thumbnail_url ,c.comment from register as r  join uploads as u on r.user_id=u.user_id left join comments as c on (c.upload_id=u.id and c.follower_id=:user_id)  where r.user_id=:user_id and u.uploads!='0' group by u.id  order by u.id desc LIMIT $starting_limit, $size");
+		    	$stmt1=$pdo->prepare("select r.*,u.*,u.id as post_id,if((r.profile_pic!=''  && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', r.profile_pic)),(profile_pic)) as dp,CASE u.upload_type
+      WHEN 'I' THEN concat('https://".$server."/Danda-Backend/uploads/images/', u.uploads)
+      WHEN 'G' THEN concat('https://".$server."/Danda-Backend/uploads/gif/', u.uploads)
+      ELSE concat('https://".$server."/Danda-Backend/uploads/videos/', u.uploads)
+  END as 'post_url',if((thumbnail!=''),(concat('https://".$server."/Danda-Backend/uploads/thumbnails/', thumbnail)),('')) AS thumbnail_url ,c.comment from register as r  join uploads as u on r.user_id=u.user_id left join comments as c on (c.upload_id=u.id and c.follower_id=:user_id)  where r.user_id=:user_id and u.uploads!='0' group by u.id  order by u.id desc LIMIT $starting_limit, $size");
 				$ar=array('user_id'=>$user_id);
 				$stmt1->execute($ar);
 			    //$op=$stmt1->fetchAll(PDO::FETCH_ASSOC);
@@ -1804,7 +1828,7 @@ function fetch_feed()
 					$stmt=$pdo->prepare("select endDate from followSubscription where toUserId=:user_id and fromUserId=:fromUserId and subscriptionType='0' ");
 					$stmt->execute(array('user_id'=>$user_id,'fromUserId'=>$result['user_id']));
 			    	$rspnss=$stmt->fetch(PDO::FETCH_ASSOC);
-			    	$isFollowSubscriptionPurchased=(strtotime($rspnss['endDate']) > strtotime(date('Y-m-d')))?'1':'0';
+			    	$isFollowSubscriptionPurchased= $rspnss ? ((strtotime($rspnss['endDate']) > strtotime(date('Y-m-d')))?'1':'0') : '0';
 					//content
 					//$stmt=$pdo->prepare("select content,content_description,price from  upload_content where upload_id=:upload_id and content!='' ");
 					$stmt=$pdo->prepare("select content,content_description,price from  upload_content where upload_id=:upload_id  ");
@@ -1859,37 +1883,40 @@ function fetch_feed()
 				    				'postMessage'=>$result['postMsg']
 				    				
 					    			);
-					$suggestion=($pageNo==1)?$suggestion :array();
-					$data1=array('result'=>$data,'suggestions'=>$suggestion ?$suggestion :array(),'is_membership'=>$res['membership'],'noti_count'=>$ncount );
+                
+					
 
 				}
+          
+              $data1=array('result'=>$data,'suggestions'=>$data_suggestion ?$data_suggestion :array(),'is_membership'=>$res['membership'],'noti_count'=>$ncount );
 
 				 $json=fetchFeedResponse('success',$res['isblock'],$totalCount,$total_pages,$data1,'no follower/following but own feed exist');  
 		    }
 		    else
 		    {
+             
 		    	//echo "data not exist";
 	            // $sql="select r.user_id,r.membership,r.username,r.fullname,if((r.profile_pic!=''),(concat('https://".$server."/api/uploads/profile/', r.profile_pic)),('')) AS profile_pic,count(f.user_id) as count  from register as r left join followers as f on f.user_id=r.user_id where r.user_id!=:user_id group by user_id order by count desc";
-	             $sql="select r.user_id,r.membership,r.username,r.fullname,if((r.profile_pic!=''  && user_type='0'),(concat('https://".$server."/api/uploads/profile/', r.profile_pic)),(profile_pic)) AS profile_pic from register as r left join followers as f on f.user_id=r.user_id where r.user_id!=:user_id and user_type='0' group by user_id ";
+	             $sql="select r.user_id,r.membership,r.username,r.fullname,if((r.profile_pic!=''  && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', r.profile_pic)),(profile_pic)) AS profile_pic from register as r  join followers as f on f.user_id=r.user_id where f.follower_id =:user_id and user_type='0' group by user_id ";
 	            $stmt=$pdo->prepare($sql);
 	            $stmt->execute(array('user_id'=>$user_id));
 	            //$stmt->execute(array());
 	            $json=$stmt->fetchAll(PDO::FETCH_ASSOC);
 	           
-	              // print_r($json);die;
+	             // print_r($json);die;
 	             /**********pagination***********/
 	            $totalCountt = $stmt->rowCount();
-	            $totalCountt = $totalCountt >20 ? 20 :$totalCountt;
+	            $totalCount = $totalCountt >20 ? 20 :$totalCountt;
 	            $total_pages = ceil($totalCountt/$size);
 	            $starting_limit=pagination($totalCount,$pageNo,$size);
-	            $stmt1=$pdo->prepare("select r.user_id,r.membership,r.username,r.fullname,if((r.profile_pic!=''  && user_type='0'),(concat('https://".$server."/api/uploads/profile/', r.profile_pic)),(profile_pic)) AS profile_pic  from register as r left join followers as f on f.user_id=r.user_id where user_type='0' and r.user_id!=:user_id group by user_id  LIMIT $starting_limit, $size");
+	            $stmt1=$pdo->prepare("select r.user_id,r.membership,r.username,r.fullname,if((r.profile_pic!=''  && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', r.profile_pic)),(profile_pic)) AS profile_pic  from register as r left join followers as f on f.user_id=r.user_id where user_type='0' and r.user_id!=:user_id group by user_id  LIMIT $starting_limit, $size");
 	             $stmt=$pdo->prepare($sql);
 	             $stmt1->execute(array('user_id'=>$user_id));
-	         	//$json=$stmt->fetchAll(PDO::FETCH_ASSOC);
+	         	$json=$stmt->fetchAll(PDO::FETCH_ASSOC);
 	           
 	              //print_r($json);die;
 	            /*****************************/
-	            $users_type=$json ? '0' :'1';
+	            $users_type=($json!='') ? '0' :'1';
 	            foreach($stmt1 as $r)
 	            {
 	            	$profile_pic= get_profile_pic($r['profile_pic']);
@@ -1899,7 +1926,7 @@ function fetch_feed()
 	            $data1=array('result'=>array(),'suggestions'=>$data ?$data :array(),'is_membership'=>$res['membership'],'noti_count'=>$ncount );
                    
 
-          		 $json=fetchFeedResponse('Follow people to start seeing the photos and videos they share',$res['isblock'],$totalCount,$total_pages,$data1,'data not exist');
+          		 $json=fetchFeedResponse('Follow people to start seeing the photos and videos they share',"0",$totalCount,$total_pages,$data1,'data not exist');
 
             
 		    }
@@ -1980,12 +2007,12 @@ function post_comments()
   			}
   			
 
-  			$stmt=$pdo->prepare("select c.id,c.follower_id,c.comment,r.username,if((r.profile_pic!=''),(concat('https://".$server."/api/uploads/profile/', r.profile_pic)),('')) AS profile_pic from  comments as c join register as r on r.user_id=c.follower_id where c.upload_id=:post_id order by c.id desc");
+  			$stmt=$pdo->prepare("select c.id,c.follower_id,c.comment,r.username,if((r.profile_pic!=''),(concat('https://".$server."/Danda-Backend/uploads/profile/', r.profile_pic)),('')) AS profile_pic from  comments as c join register as r on r.user_id=c.follower_id where c.upload_id=:post_id order by c.id desc");
 			$stmt->execute(array('post_id'=>$post_id));
 	     	$output=$stmt->fetch(PDO::FETCH_ASSOC);
 	     	//print_r($output);
   			
-	  		$stmt=$pdo->prepare("select *,if((profile_pic!=''  && user_type='0'),(concat('https://".$server."/api/uploads/profile/', profile_pic)),(profile_pic)) AS profile_pic from  register where user_id=:user_id");
+	  		$stmt=$pdo->prepare("select *,if((profile_pic!=''  && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', profile_pic)),(profile_pic)) AS profile_pic from  register where user_id=:user_id");
 			$stmt->execute(array('user_id'=>$user_id));
 		    $result=$stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -2095,7 +2122,7 @@ function post_likes()
 
                    // 6BUUBBCr
 		  			//send noti
-			  		$stmt=$pdo->prepare("select *,if((profile_pic!=''),(concat('https://".$server."/api/uploads/profile/', profile_pic)),('')) AS profile_pic from  register where user_id=:user_id");
+			  		$stmt=$pdo->prepare("select *,if((profile_pic!=''),(concat('https://".$server."/Danda-Backend/uploads/profile/', profile_pic)),('')) AS profile_pic from  register where user_id=:user_id");
 					$stmt->execute(array('user_id'=>$user_id));
 				    $result=$stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -2197,7 +2224,7 @@ function get_comments()
     $result=$stmt->fetch(PDO::FETCH_ASSOC);
     if($result) 
     {
-    	$stmt=$pdo->prepare("select c.id,c.follower_id,c.comment,r.username,if((r.profile_pic!=''),(concat('https://".$server."/api/uploads/profile/', r.profile_pic)),('')) AS profile_pic from  comments as c join register as r on r.user_id=c.follower_id where c.upload_id=:post_id order by id desc");
+    	$stmt=$pdo->prepare("select c.id,c.follower_id,c.comment,r.username,if((r.profile_pic!=''),(concat('https://".$server."/Danda-Backend/uploads/profile/', r.profile_pic)),('')) AS profile_pic from  comments as c join register as r on r.user_id=c.follower_id where c.upload_id=:post_id order by id desc");
 		$stmt->execute(array('post_id'=>$post_id));
      	$res=$stmt->fetchAll(PDO::FETCH_ASSOC);
      	if($res)
@@ -2206,7 +2233,7 @@ function get_comments()
     		$totalCount = $stmt->rowCount();
     		$total_pages = ceil($totalCount/$size);
 	    	$starting_limit=pagination($totalCount,$pageNo,$size);
-	    	$stmt1=$pdo->prepare("select c.id,c.follower_id,c.comment,r.username,if((r.profile_pic!=''),(concat('https://".$server."/api/uploads/profile/', r.profile_pic)),('')) AS profile_pic from  comments as c join register as r on r.user_id=c.follower_id where c.upload_id=:post_id order by id desc LIMIT $starting_limit, $size");
+	    	$stmt1=$pdo->prepare("select c.id,c.follower_id,c.comment,r.username,if((r.profile_pic!=''),(concat('https://".$server."/Danda-Backend/uploads/profile/', r.profile_pic)),('')) AS profile_pic from  comments as c join register as r on r.user_id=c.follower_id where c.upload_id=:post_id order by id desc LIMIT $starting_limit, $size");
 			$ar=array('post_id'=>$post_id);
 			$stmt1->execute($ar);
 			/*****************************/
@@ -2240,7 +2267,7 @@ function get_likes()
      $result=$stmt->fetch(PDO::FETCH_ASSOC);
      if($result) 
      {
-    	$stmt=$pdo->prepare("select l.id,l.follower_id,r.username,if((r.profile_pic!=''),(concat('https://".$server."/api/uploads/profile/',r.profile_pic)),('')) AS profile_pic from  likes as l join register as r on r.user_id=l.follower_id where l.upload_id=:post_id");
+    	$stmt=$pdo->prepare("select l.id,l.follower_id,r.username,if((r.profile_pic!=''),(concat('https://".$server."/Danda-Backend/uploads/profile/',r.profile_pic)),('')) AS profile_pic from  likes as l join register as r on r.user_id=l.follower_id where l.upload_id=:post_id");
 		$stmt->execute(array('post_id'=>$post_id));
 	    $res=$stmt->fetchAll(PDO::FETCH_ASSOC);
 	    if($res)
@@ -2283,7 +2310,7 @@ function trending()
 	    		if ($value['upload_type']=='I') {
 	    			//images
 	    			$images[]=array(
-	    				           'image'=>"https://".$server."/api/uploads/images/".$value['uploads'],
+	    				           'image'=>"https://".$server."/Danda-Backend/uploads/images/".$value['uploads'],
 	    				           'upload_id'=>$value['id'],
 	    				           'upload_type'=>$value['upload_type'],
 	    		                  );
@@ -2291,14 +2318,14 @@ function trending()
 	    		{
 	    			//video
 	    			$videos[]=array(
-	    				           'image'=>"https://".$server."/api/uploads/videos/".$value['uploads'],
+	    				           'image'=>"https://".$server."/Danda-Backend/uploads/videos/".$value['uploads'],
 	    				           'upload_id'=>$value['id'],
 	    				           'upload_type'=>$value['upload_type'],
 	    		                  );
 	    		}else{
 	    			//gif
 	    			$gif[]=array(
-	    				           'image'=>"https://".$server."/api/uploads/gif/".$value['uploads'],
+	    				           'image'=>"https://".$server."/Danda-Backend/uploads/gif/".$value['uploads'],
 	    				           'upload_id'=>$value['id'],
 	    				           'upload_type'=>$value['upload_type'],
 	    		                  );
@@ -2337,10 +2364,10 @@ function viewAllTrendings()
 
 
 	$stmt=$pdo->prepare("SELECT u.*,t.trending_count ,usr.username,usr.profile_pic,CASE u.upload_type
-      WHEN 'I' THEN concat('https://".$server."/api/uploads/images/', u.uploads)
-      WHEN 'G' THEN concat('https://".$server."/api/uploads/gif/', u.uploads)
-      ELSE concat('https://".$server."/api/uploads/videos/', u.uploads)
-  END as 'post_url',if((thumbnail!=''),(concat('https://".$server."/api/uploads/thumbnails/', thumbnail)),('')) AS thumbnail_url  FROM `uploads` as u left JOIN trending as t on u.id=t.upload_id left JOIN register as usr on usr.user_id=u.user_id where u.upload_type=:type group by u.id  ORDER by t.trending_count desc");
+      WHEN 'I' THEN concat('https://".$server."/Danda-Backend/uploads/images/', u.uploads)
+      WHEN 'G' THEN concat('https://".$server."/Danda-Backend/uploads/gif/', u.uploads)
+      ELSE concat('https://".$server."/Danda-Backend/uploads/videos/', u.uploads)
+  END as 'post_url',if((thumbnail!=''),(concat('https://".$server."/Danda-Backend/uploads/thumbnails/', thumbnail)),('')) AS thumbnail_url  FROM `uploads` as u left JOIN trending as t on u.id=t.upload_id left JOIN register as usr on usr.user_id=u.user_id where u.upload_type=:type group by u.id  ORDER by t.trending_count desc");
 		$stmt->execute(array('type'=>$type));
 	    $res=$stmt->fetchAll(PDO::FETCH_ASSOC);
 	    if($res)
@@ -2351,10 +2378,10 @@ function viewAllTrendings()
 	    	$starting_limit=pagination($totalCount,$pageNo,$size);
 
 	    	$stmt1=$pdo->prepare("SELECT u.*,t.trending_count ,usr.username,usr.profile_pic,CASE u.upload_type
-			      WHEN 'I' THEN concat('https://".$server."/api/uploads/images/', u.uploads)
-			      WHEN 'G' THEN concat('https://".$server."/api/uploads/gif/', u.uploads)
-			      ELSE concat('https://".$server."/api/uploads/videos/', u.uploads)
-			  END as 'post_url',if((thumbnail!=''),(concat('https://".$server."/api/uploads/thumbnails/', thumbnail)),('')) AS thumbnail_url  FROM `uploads` as u left JOIN trending as t on u.id=t.upload_id left JOIN register as usr on usr.user_id=u.user_id where u.upload_type=:type group by u.id  ORDER by t.trending_count desc  LIMIT $starting_limit, $size");
+			      WHEN 'I' THEN concat('https://".$server."/Danda-Backend/uploads/images/', u.uploads)
+			      WHEN 'G' THEN concat('https://".$server."/Danda-Backend/uploads/gif/', u.uploads)
+			      ELSE concat('https://".$server."/Danda-Backend/uploads/videos/', u.uploads)
+			  END as 'post_url',if((thumbnail!=''),(concat('https://".$server."/Danda-Backend/uploads/thumbnails/', thumbnail)),('')) AS thumbnail_url  FROM `uploads` as u left JOIN trending as t on u.id=t.upload_id left JOIN register as usr on usr.user_id=u.user_id where u.upload_type=:type group by u.id  ORDER by t.trending_count desc  LIMIT $starting_limit, $size");
 				$ar=array('type'=>$type);
 				$stmt1->execute($ar);
 				foreach($stmt1 as $result)
@@ -2503,7 +2530,7 @@ function update_profile()
 			$updata_data=update_multi_where('register', $where, $data); 
 			if($updata_data=1)
 			{
-				$pp="https://".$server."/api/uploads/profile/".$profile_pic;
+				$pp="https://".$server."/Danda-Backend/uploads/profile/".$profile_pic;
 				$data=array('profile_pic'=>$pp,'fullname'=>$name,'username'=>$username,'bio'=>$bio,'email'=>$email,'contact'=>$contact,'gender'=>$gender);
 				$json=array('status'=>'1','message'=>"Success",'data'=>$data);   	
 			}
@@ -2545,7 +2572,7 @@ function update_profile_pic()
         $where=array('user_id'=>$user_id);
 		$data1=array('profile_pic'=>$profile_pic);
 		$stmt_updt=update_multi_where('register', $where, $data1);
-		$pp="https://".$server."/api/uploads/profile/".$profile_pic;
+		$pp="https://".$server."/Danda-Backend/uploads/profile/".$profile_pic;
 		//print_r($pp);die;
 		$json=array('message'=>'success','status'=>'1','profile_pic'=>$pp);
 	}
@@ -2565,7 +2592,7 @@ function fetch_profile()
 	$server=$_SERVER['HTTP_HOST'];
 	/*$stmt=$pdo->prepare("select if((profile_pic!=''),(concat('https://".$server."/api/uploads/profile/', profile_pic)),('')) as profile_pic,username,fullname,website,bio,email,password,country_code,contact,gender,paypal_id,countryIso from register where user_id=:user_id 
 		");*/
-	$stmt=$pdo->prepare("select if((profile_pic!='' && user_type='0'),(concat('https://".$server."/api/uploads/profile/', profile_pic)),(profile_pic)) as profile_pic,username,fullname,bio,email,password,country_code,contact,gender,countryIso from register where user_id=:user_id 
+	$stmt=$pdo->prepare("select if((profile_pic!='' && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', profile_pic)),(profile_pic)) as profile_pic,username,fullname,bio,email,password,country_code,contact,gender,countryIso from register where user_id=:user_id 
 		");
 
 	$stmt->execute(array('user_id'=>$user_id));
@@ -2669,11 +2696,11 @@ function detail_page()
     if($res)
     {
 
-    	$stmt=$pdo->prepare("select r.*,u.*,if((r.profile_pic!=''),(concat('https://".$server."/api/uploads/profile/', r.profile_pic)),('')) AS profile_pic,CASE u.upload_type
-      WHEN 'I' THEN concat('https://".$server."/api/uploads/images/', u.uploads)
-      WHEN 'G' THEN concat('https://".$server."/api/uploads/gif/', u.uploads)
-      ELSE concat('https://".$server."/api/uploads/videos/', u.uploads)
-  END as 'post_url',count(c.id) as comments_count,if((thumbnail!=''),(concat('https://".$server."/api/uploads/thumbnails/', thumbnail)),('')) AS thumbnail_url from uploads as u join register as r on r.user_id=u.user_id left join comments as c on c.upload_id=u.id   where u.id=:post_id ");
+    	$stmt=$pdo->prepare("select r.*,u.*,if((r.profile_pic!=''),(concat('https://".$server."/Danda-Backend/uploads/profile/', r.profile_pic)),('')) AS profile_pic,CASE u.upload_type
+      WHEN 'I' THEN concat('https://".$server."/Danda-Backend/uploads/images/', u.uploads)
+      WHEN 'G' THEN concat('https://".$server."/Danda-Backend/uploads/gif/', u.uploads)
+      ELSE concat('https://".$server."/Danda-Backend/uploads/videos/', u.uploads)
+  END as 'post_url',count(c.id) as comments_count,if((thumbnail!=''),(concat('https://".$server."/Danda-Backend/uploads/thumbnails/', thumbnail)),('')) AS thumbnail_url from uploads as u join register as r on r.user_id=u.user_id left join comments as c on c.upload_id=u.id   where u.id=:post_id ");
     		/*$stmt=$pdo->prepare("select r.*,u.id,u.uploads,u.thumbnail,u.upload_type,u.caption,CASE u.upload_type
       WHEN 'I' THEN concat('https://".$server."/api/uploads/images/', u.uploads)
       WHEN 'G' THEN concat('https://".$server."/api/uploads/gif/', u.uploads)
@@ -2701,14 +2728,14 @@ function detail_page()
 				$stmt->execute(array('upload_id'=>$result['id']));
 		    	$rslts=$stmt->fetchAll(PDO::FETCH_ASSOC);
 		    	//own profile_pic
-	    		$stmt_sel=$pdo->prepare("SELECT if((profile_pic!='' && user_type='0'),(concat('https://".$server."/api/uploads/profile/', profile_pic)),(profile_pic)) AS follower_profile from register where user_id=:user_id");
+	    		$stmt_sel=$pdo->prepare("SELECT if((profile_pic!='' && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', profile_pic)),(profile_pic)) AS follower_profile from register where user_id=:user_id");
 				$array_sel=array('user_id'=>$user_id);
 				$stmt_sel->execute($array_sel);
 				$outputs=$stmt_sel->fetch(PDO::FETCH_ASSOC);
 		
 			    	//comments
 				
-		    	$stmt=$pdo->prepare("select c.comment,r.user_id,if((r.profile_pic!='' && user_type='0'),(concat('https://".$server."/api/uploads/profile/', r.profile_pic)),(profile_pic)) AS profile_pic,r.username from  comments as c join register as r on r.user_id=c.follower_id  where upload_id=:post_id limit 3");
+		    	$stmt=$pdo->prepare("select c.comment,r.user_id,if((r.profile_pic!='' && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', r.profile_pic)),(profile_pic)) AS profile_pic,r.username from  comments as c join register as r on r.user_id=c.follower_id  where upload_id=:post_id limit 3");
 				$stmt->execute(array('post_id'=>$post_id));
 		    	$output=$stmt->fetchAll(PDO::FETCH_ASSOC);
 		    	//print_r($output);die;
@@ -2726,9 +2753,9 @@ function detail_page()
 				$counts=trim($result['comments_count'],'"');  //remove '' 
 
 				//post shared or not
-					$stmt=$pdo->prepare("select r.user_id,r.username,(SELECT caption FROM uploads WHERE id=:post_id) as caption,if((r.profile_pic!='' && user_type='0'),(concat('https://".$server."/api/uploads/profile/', r.profile_pic)),(profile_pic)) as profile_pic
+					$stmt=$pdo->prepare("select r.user_id,r.username,(SELECT caption FROM uploads WHERE id=:post_id) as caption,if((r.profile_pic!='' && user_type='0'),(concat('https://".$server."/Danda-Backend/uploads/profile/', r.profile_pic)),(profile_pic)) as profile_pic
                         from register as r   join uploads as u on r.user_id=u.post_parent WHERE u.post_parent=:post_parent GROUP by user_id");
-					$stmt->execute(array('post_parent'=>$result['post_parent'],'post_id'=>$result['post_id']));
+					$stmt->execute(array('post_parent'=>$result['post_parent'],'post_id'=>$post_id));
 					$shared=$stmt->fetchAll(PDO::FETCH_ASSOC);
 					$sh=($shared)? $shared : array();
 					
@@ -2746,10 +2773,10 @@ function detail_page()
 			    				'caption'=>($result['caption']) ? $result['caption'] :'',
 			    				'is_explicit'=>($result['explicit']==2) ? '1' : '0' ,
 			    				'is_view'=>!empty($outpt) ? '1' :'0',
-			    				'total_views'=>$otpt['totalViews']? $otpt['totalViews']:'0',
+			    				'total_views'=>$otpt ? $otpt['totalViews']:'0',
 			    				//'copy_url'=>$copy_url? $copy_url : '' ,
 			    				//	'is_purchased'=>($result['membership']==2) ? 1 : 0 ,
-			    				'likes_count'=>($reslt1['like_count']) ? $reslt1['like_count'] :'0',
+			    				'likes_count'=> $reslt1 ? $reslt1['like_count'] :'0',
 			    				'likes'=>($results)? '1' : '0',
 			    				'comments_count'=>$counts ? $counts : '0',
 			    				'comments'=>$output ? $output : array(),
@@ -2791,67 +2818,127 @@ function watermark_video($value='')
 	global $pdo;
 	global $server;
 	extract($_REQUEST);
-
+	$vdo_name = $_FILES['vdo_name']['name'];
+	//print_r($_SERVER['DOCUMENT_ROOT']);die;
 
 	if(!file_exists($vdo_name))
 	{
-		    $videoSource = $_SERVER['DOCUMENT_ROOT'].'/api/uploads/videos/'.$vdo_name;
+		    $videoSource = $_SERVER['DOCUMENT_ROOT'].'/uploads/'.$vdo_name;
 		    $reqExtension = 'mp4';
-		    $watermark = $_SERVER['DOCUMENT_ROOT'].'/api/uploads/DANDA_72.png';
+		    $watermark = $_SERVER['DOCUMENT_ROOT'].'/uploads/DANDA_72.png';
+			
 
-		    $ffmpeg = FFMpeg\FFMpeg::create([
-			    'ffmpeg.binaries' => '/usr/bin/ffmpeg',
-			    'ffprobe.binaries' => '/usr/bin/ffprobe',
-			    'timeout' => 3600, 'ffmpeg.threads' => 12
-			]);
+			$ffmpeg = \FFMpeg\FFMpeg::create([
+                'ffmpeg.binaries'  => 'C:\ffmpeg\bin\ffmpeg.exe', // the path to the FFMpeg binary
+                'ffprobe.binaries' => 'C:\ffmpeg\bin\ffprobe.exe', // the path to the FFProbe binary
+                'timeout'          => 3600, // the timeout for the underlying process
+                'ffmpeg.threads'   => 12,   // the number of threads that FFMpeg should use
+            ]);
 
-		    $video = $ffmpeg->open($videoSource);
+		    $video = $ffmpeg->open($vdo_name);
 
-		    $format = new FFMpeg\Format\Video\X264('libmp3lame', 'libx264');
-            $width=200;
-            $height=200;
-
-
-		    if (!empty($watermark))
-		    {
-		        $video  ->filters()
-		                ->resize(new FFMpeg\Coordinate\Dimension($width, $height), FFMpeg\Filters\Video\ResizeFilter::RESIZEMODE_SCALE_HEIGHT)
-		                ->watermark($watermark, array(
-		                    'position' => 'relative',
-		                    'bottom' => 0,
-		                    'right' => 0,
-		                ));
-		          
-		    }
-
-
-
-		    $format
-		    -> setKiloBitrate(1000)
-		    -> setAudioChannels(2)
-		    -> setAudioKiloBitrate(256);
-
-		//ffmpeg -i video.mp4 -i watermark.png -filter_complex "[1][0]scale2ref=w='iw*5/100':h='ow/mdar'[wm][vid];[vid][wm]overlay=10:10" output.mp4
-
-
-		    $randomFileName = rand().".$reqExtension";
-		    $path='/uploads/watermark_videos';
-		     if (!is_dir($path))
-		    {
-		        mkdir($path, 0777, true);
-		    }
-		    $saveLocation = getcwd(). $path.'/'.$randomFileName;
-		    $video->save($format, $saveLocation);
-    }else{
-    	$randomFileName = $vdo_name;
+			$video
+            ->filters()
+            ->resize(new \FFMpeg\Coordinate\Dimension(320, 240))
+            ->synchronize();
+        $frame = $video->frame(\FFMpeg\Coordinate\TimeCode::fromSeconds($sec));
+        $frame->save($videoSource);
+	}else{
+    
+     
+    	$videoSource = $vdo_name;
 
     }
-    //print_r($video);
-	$json=array('message'=>'success','status'=>'1','url'=>"https://$server/api/uploads/watermark_videos/$randomFileName");
+
+		$json=array('message'=>'success','status'=>'1','url'=>"https://$server/Danda-Backend/uploads/watermark_videos/$videoSource");
 	
-	echo "{\"response\":" . json_encode($json) . "}";
+	// echo "{\"response\":" . json_encode($json) . "}";
+
+	// 	    $format = new FFMpeg\Format\Video\X264('libmp3lame', 'libx264');
+    //         $width=200;
+    //         $height=200;
+
+
+	// 	    if (!empty($watermark))
+	// 	    {
+	// 	        $video  ->filters()
+	// 	                ->resize(new FFMpeg\Coordinate\Dimension($width, $height), FFMpeg\Filters\Video\ResizeFilter::RESIZEMODE_SCALE_HEIGHT)
+	// 	                ->watermark($watermark, array(
+	// 	                    'position' => 'relative',
+	// 	                    'bottom' => 0,
+	// 	                    'right' => 0,
+	// 	                ));
+		          
+	// 	    }
+
+
+
+	// 	    $format
+	// 	    -> setKiloBitrate(1000)
+	// 	    -> setAudioChannels(2)
+	// 	    -> setAudioKiloBitrate(256);
+
+	// 	//ffmpeg -i video.mp4 -i watermark.png -filter_complex "[1][0]scale2ref=w='iw*5/100':h='ow/mdar'[wm][vid];[vid][wm]overlay=10:10" output.mp4
+
+
+	// 	    $randomFileName = rand().".$reqExtension";
+	// 	    $path='/uploads/watermark_videos';
+	// 	     if (!is_dir($path))
+	// 	    {
+	// 	        mkdir($path, 0777, true);
+	// 	    }
+	// 	    $saveLocation = getcwd(). $path.'/'.$randomFileName;
+	// 	    $video->save($format, $saveLocation);
+    // }else{
+    // 	$randomFileName = $vdo_name;
+
+    // }
+    // //print_r($video);
+	// $json=array('message'=>'success','status'=>'1','url'=>"https://$server/Danda-Backend/uploads/watermark_videos/$randomFileName");
+	
+	// echo "{\"response\":" . json_encode($json) . "}";
 
 	
+
+	// ///////////////
+	// $sec = 3;
+    //     $movie = $file;
+
+    //     $dirPath = app()->basePath('public/events/thumbnail/'); //The directory where the setting file is saved
+    //     if (!is_dir($dirPath)) {
+    //         //Create a directory if the directory does not exist
+    //         @mkdir($dirPath);
+    //     }
+    //     $name = 'thumb-' . time() . '.png';
+    //     $thumbnail = $dirPath . $name;
+
+    //     if (env('APP_ENV') == 'local') {
+    //         //staging
+    //         $ffmpeg = \FFMpeg\FFMpeg::create([
+    //             'ffmpeg.binaries'  => 'C:\ffmpeg\bin\ffmpeg.exe', // the path to the FFMpeg binary
+    //             'ffprobe.binaries' => 'C:\ffmpeg\bin\ffprobe.exe', // the path to the FFProbe binary
+    //             'timeout'          => 3600, // the timeout for the underlying process
+    //             'ffmpeg.threads'   => 12,   // the number of threads that FFMpeg should use
+    //         ]);
+    //     } else {
+    //         //production
+    //         $ffmpeg = \FFMpeg\FFMpeg::create([
+    //             //Under linux
+    //             'ffmpeg.binaries'  => '/usr/bin/ffmpeg',
+    //             'ffprobe.binaries' => '/usr/bin/ffprobe',
+
+    //             'timeout'          => 3600, // the timeout for the underlying process
+    //             'ffmpeg.threads'   => 12,   // the number of threads that FFMpeg should use
+    //         ]);
+    //     }
+
+    //     $video = $ffmpeg->open($movie);
+    //     $video
+    //         ->filters()
+    //         ->resize(new \FFMpeg\Coordinate\Dimension(320, 240))
+    //         ->synchronize();
+    //     $frame = $video->frame(\FFMpeg\Coordinate\TimeCode::fromSeconds($sec));
+    //     $frame->save($thumbnail);
 	
 }
 
@@ -2959,7 +3046,7 @@ function sharePost($value='')
 	}else{
 		//$json=new stdClass();
 		$status='0';
-		$message='user not found';
+		$message='Post not found';
 	}
 
     $json=array('message'=>$message,'status'=>$status,'data'=>$json);
@@ -2974,7 +3061,7 @@ function block_list()
 	global $server;
 	extract($_REQUEST);
 
-	$stmt_sel=$pdo->prepare("select b.to_userid as user_id,r.username,r.fullname,if((r.profile_pic!=''),(concat('https://".$server."/api/uploads/profile/', r.profile_pic)),('')) AS profile_pic from block_users as b join register as r on r.user_id=b.to_userid where from_userid=:user_id");
+	$stmt_sel=$pdo->prepare("select b.to_userid as user_id,r.username,r.fullname,if((r.profile_pic!=''),(concat('https://".$server."/Danda-Backend/uploads/profile/', r.profile_pic)),('')) AS profile_pic from block_users as b join register as r on r.user_id=b.to_userid where from_userid=:user_id");
     $stmt_sel->execute(array(':user_id'=>$user_id));
     $row_sel=$stmt_sel->fetchAll(PDO::FETCH_ASSOC);
     if($row_sel)
@@ -3200,7 +3287,47 @@ function add_reportReasons()
 
 function test_mail($value='')
 {
-	$data=sendemail('heenaverma400@gmail.com', 'Hello', "hello howz u?");
+	$data=sendemail('test@gmail.com', 'Hello', "hello howz u?");
     print_r($data); 
+}
+
+
+/*	----------------------------Change password------------------------------------*/
+function changePass()
+{
+	global $pdo;
+	extract($_REQUEST);
+
+	$stmt=$pdo->prepare("select * from register where password=:oldpassword and user_id=:user_id");
+    $stmt->execute(array(':oldpassword'=>$oldpassword,':user_id'=>$user_id));
+    $row_sel=$stmt->fetch(PDO::FETCH_ASSOC);
+	//print_r($row_sel);die;
+	if($row_sel['password']!=$oldpassword)
+	{
+		$status='0';
+		$message='invalid oldpassword';
+		//$json= new stdClass();
+	}
+	else
+	{
+		if(strlen($newpassword) < '6')
+		{
+			$status='0';
+			$message='Password must be more than 6 character';
+		}
+		else
+		{
+		
+			$where=array('user_id'=>$user_id);
+			$data=array('password'=>$newpassword);
+			$stmt_updt=update_multi_where('register', $where, $data); 
+			
+			
+			$status='1';
+			$message='success';
+		}
+	}
+	    $json=array('message'=>$message,'status'=>$status);
+	    echo "{\"response\":" . json_encode($json) . "}";	
 }
 
